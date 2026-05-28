@@ -29,6 +29,7 @@ public class UReportConfig {
     public final boolean saveRelations;
     public final String outputFile;
     public final boolean includeSteps;
+    public final boolean autoDetectPlatform;
 
     public UReportConfig() {
         Properties props = loadProperties();
@@ -44,8 +45,19 @@ public class UReportConfig {
         team = get(props, "ureport.team");
         browser = get(props, "ureport.browser");
         device = get(props, "ureport.device");
-        platform = get(props, "ureport.platform");
-        platformVersion = get(props, "ureport.platform_version");
+
+        String adp = get(props, "ureport.autoDetectPlatform");
+        autoDetectPlatform = (adp == null) || Boolean.parseBoolean(adp);
+
+        String cfgPlatform = get(props, "ureport.platform");
+        String cfgPlatformVersion = get(props, "ureport.platform_version");
+        if (autoDetectPlatform) {
+            platform = (cfgPlatform != null) ? cfgPlatform : System.getProperty("os.name");
+            platformVersion = (cfgPlatformVersion != null) ? cfgPlatformVersion : System.getProperty("os.version");
+        } else {
+            platform = cfgPlatform;
+            platformVersion = cfgPlatformVersion;
+        }
         stage = get(props, "ureport.stage");
         version = get(props, "ureport.version");
 

@@ -6,6 +6,7 @@ import org.testng.ISuite;
 import org.testng.ISuiteResult;
 import org.testng.ITestContext;
 import org.testng.ITestListener;
+import org.testng.ITestNGMethod;
 import org.testng.ITestResult;
 import org.testng.xml.XmlSuite;
 
@@ -137,6 +138,11 @@ public class UReportListener implements IReporter, ITestListener {
                 }
                 for (ITestResult r : ctx.getSkippedTests().getAllResults()) {
                     allResults.add(r);
+                    // Intermediate retried failures: TestNG marks them SKIP and puts them here.
+                    // wasRetried()=true means this attempt was re-run → belongs in retriedMethodKeys.
+                    if (r.wasRetried()) {
+                        retriedMethodKeys.add(resultKey(r));
+                    }
                 }
 
                 for (ITestResult r : ctx.getPassedConfigurations().getAllResults()) {
@@ -177,6 +183,30 @@ public class UReportListener implements IReporter, ITestListener {
             String uid = (String) payload.get("uid");
             if (config.saveRelations && seenUids.add(uid)) {
                 relations.add(buildRelationPayload(uid, result, config));
+            }
+        }
+
+        // Disabled tests (@Test(enabled=false)) never fire listener callbacks and never appear in
+        // passed/failed/skipped collections; find them via ctx.getExcludedMethods().
+        Set<String> seenResultKeys = new HashSet<>();
+        for (ITestResult r : allResults) seenResultKeys.add(resultKey(r));
+
+        for (ISuite suite : suites) {
+            for (ISuiteResult sr : suite.getResults().values()) {
+                ITestContext ctx = sr.getTestContext();
+                for (ITestNGMethod m : ctx.getExcludedMethods()) {
+                    if (!m.isTest() || m.getEnabled()) continue; // only @Test(enabled=false)
+                    String key = m.getTestClass().getName() + "#" + m.getMethodName();
+                    if (!seenResultKeys.add(key)) continue;
+
+                    Map<String, Object> payload = buildDisabledTestPayload(m, buildId, config);
+                    testPayloads.add(payload);
+
+                    String uid = (String) payload.get("uid");
+                    if (config.saveRelations && seenUids.add(uid)) {
+                        relations.add(buildDisabledRelationPayload(uid, m, config));
+                    }
+                }
             }
         }
 
@@ -264,6 +294,13 @@ public class UReportListener implements IReporter, ITestListener {
             }
         } else if (testStatus == ITestResult.FAILURE
                 || testStatus == ITestResult.SUCCESS_PERCENTAGE_FAILURE) {
+            status = "FAIL";
+            isRerun = retriedMethodKeys.contains(key);
+        } else if (testStatus == ITestResult.SKIP
+                && result.wasRetried()
+                && result.getThrowable() != null) {
+            // Retried failure: TestNG changes the status to SKIP when re-running a failed test.
+            // Treat as FAIL; mark is_rerun if the method key is known to be retried.
             status = "FAIL";
             isRerun = retriedMethodKeys.contains(key);
         } else {
@@ -401,6 +438,61 @@ public class UReportListener implements IReporter, ITestListener {
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    private Map<String, Object> buildDisabledTestPayload(
+            ITestNGMethod m, String buildId, UReportConfig config) {
+        Method method = m.getConstructorOrMethod().getMethod();
+        UReport annotation = (method != null) ? method.getAnnotation(UReport.class) : null;
+        String uid = (annotation != null && !annotation.uid().isEmpty())
+                ? annotation.uid()
+                : m.getTestClass().getName() + "#" + m.getMethodName();
+        long now = System.currentTimeMillis();
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("uid", uid);
+        payload.put("name", m.getMethodName());
+        payload.put("build", buildId);
+        payload.put("status", "SKIP");
+        payload.put("start_time", toIso(now));
+        payload.put("end_time", toIso(now));
+        payload.put("is_rerun", false);
+        payload.put("info", buildDisabledInfo(m, annotation));
+        return payload;
+    }
+
+    private Map<String, Object> buildDisabledInfo(ITestNGMethod m, UReport annotation) {
+        Map<String, Object> info = new LinkedHashMap<>();
+        Set<String> tags = new LinkedHashSet<>();
+        if (annotation != null) for (String t : annotation.tags()) tags.add(t);
+        String[] groups = m.getGroups();
+        if (groups != null) Collections.addAll(tags, groups);
+        if (!tags.isEmpty()) info.put("tags", new ArrayList<>(tags));
+        if (annotation != null && annotation.components().length > 0)
+            info.put("components", Arrays.asList(annotation.components()));
+        if (annotation != null && annotation.teams().length > 0)
+            info.put("teams", Arrays.asList(annotation.teams()));
+        info.put("duration", 0L);
+        return info;
+    }
+
+    private Map<String, Object> buildDisabledRelationPayload(
+            String uid, ITestNGMethod m, UReportConfig config) {
+        Map<String, Object> rel = new LinkedHashMap<>();
+        rel.put("uid", uid);
+        rel.put("product", config.product);
+        rel.put("type", config.type);
+        Method method = m.getConstructorOrMethod().getMethod();
+        UReport annotation = (method != null) ? method.getAnnotation(UReport.class) : null;
+        Set<String> tags = new LinkedHashSet<>();
+        if (annotation != null) for (String t : annotation.tags()) tags.add(t);
+        String[] groups = m.getGroups();
+        if (groups != null) Collections.addAll(tags, groups);
+        if (!tags.isEmpty()) rel.put("tags", new ArrayList<>(tags));
+        if (annotation != null && annotation.components().length > 0)
+            rel.put("components", Arrays.asList(annotation.components()));
+        if (annotation != null && annotation.teams().length > 0)
+            rel.put("teams", Arrays.asList(annotation.teams()));
+        return rel;
+    }
 
     private String resultKey(ITestResult result) {
         return result.getTestClass().getName() + "#" + result.getMethod().getMethodName();

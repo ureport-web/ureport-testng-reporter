@@ -8,7 +8,7 @@ TestNG reporter that ships test results to [UReport](https://github.com/ureport)
 
 ```xml
 <dependency>
-  <groupId>io.ureport</groupId>
+  <groupId>io.github.ureport-web</groupId>
   <artifactId>ureport-testng-reporter</artifactId>
   <version>1.0.0</version>
   <scope>test</scope>
@@ -18,7 +18,7 @@ TestNG reporter that ships test results to [UReport](https://github.com/ureport)
 ### Gradle (Kotlin DSL)
 
 ```kotlin
-testImplementation("io.ureport:ureport-testng-reporter:1.0.0")
+testImplementation("io.github.ureport-web:ureport-testng-reporter:1.0.0")
 ```
 
 ## Configuration
@@ -29,7 +29,7 @@ testImplementation("io.ureport:ureport-testng-reporter:1.0.0")
 
 ```xml
 <listeners>
-  <listener class-name="io.ureport.testng.UReportListener"/>
+  <listener class-name="io.github.ureport-web.testng.UReportListener"/>
 </listeners>
 ```
 
@@ -43,7 +43,7 @@ testImplementation("io.ureport:ureport-testng-reporter:1.0.0")
     <properties>
       <property>
         <name>listener</name>
-        <value>io.ureport.testng.UReportListener</value>
+        <value>io.github.ureport-web.testng.UReportListener</value>
       </property>
     </properties>
     <systemPropertyVariables>
@@ -60,7 +60,7 @@ testImplementation("io.ureport:ureport-testng-reporter:1.0.0")
 
 ```kotlin
 test {
-  useTestNG { listeners.add("io.ureport.testng.UReportListener") }
+  useTestNG { listeners.add("io.github.ureport-web.testng.UReportListener") }
   systemProperty("ureport.serverUrl", "https://ureport.example.com")
   systemProperty("ureport.apiToken", findProperty("ureportToken") ?: "")
   systemProperty("ureport.product", "my-app")
@@ -90,12 +90,13 @@ All properties can be set as system properties (`-Dureport.xxx`) or in `ureport.
 | `ureport.saveRelations` | no | `true` | Whether to save test relations |
 | `ureport.outputFile` | no | — | Path to write JSON output file |
 | `ureport.includeSteps` | no | `true` | Whether to include setup/body/teardown steps |
+| `ureport.autoDetectPlatform` | no | `true` | Auto-fill `platform`/`platform_version` from OS when not set |
 
 ## Annotating tests
 
 ```java
-import io.ureport.testng.UReport;
-import io.ureport.testng.UReportSteps;
+import io.github.ureport-web.testng.UReport;
+import io.github.ureport-web.testng.UReportSteps;
 
 @Test
 @UReport(uid = "TC-001", tags = {"smoke"}, components = {"Cart"}, teams = {"checkout"})
