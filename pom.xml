@@ -6,7 +6,7 @@
 
     <groupId>io.github.ureport-web</groupId>
     <artifactId>ureport-testng-reporter</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
     <packaging>jar</packaging>
 
     <name>UReport TestNG Reporter</name>
